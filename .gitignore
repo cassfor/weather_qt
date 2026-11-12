@@ -1,0 +1,29 @@
+# Qt Creator local settings
+.qtcreator/
+*.pro.user*
+.qmake.stash
+
+# Build directories and qmake output
+/build*/
+/debug/
+/release/
+/Makefile*
+/ui_*.h
+/moc_*.cpp
+/moc_predefs.h
+/qrc_*.cpp
+!/qrc_weatypeico_manual.cpp
+*.o
+*.obj
+*.exe
+*.dll
+*.a
+*.lib
+*.pdb
+*.ilk
+
+# Logs, local caches and obsolete generated UI backup
+*.log
+__pycache__/
+/weather-cache/
+/ui_weather.h.legacy

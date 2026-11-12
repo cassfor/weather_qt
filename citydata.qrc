@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/data">
+        <file>citycode-2019-08-23.json</file>
+        <file>city-search.json</file>
+    </qresource>
+</RCC>
