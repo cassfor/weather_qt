@@ -43,20 +43,17 @@ const QRect Weather::rect[2] = {
     QRect(50, 80, 50, 20) // “日出日落”文本
 };
 
-Weather::Weather(QWidget *parent, const QString &cacheDirectory) :
+Weather::Weather(QWidget *parent, const QString &cacheDirectory, QNetworkAccessManager *network) :
     QWidget(parent),
     ui(new Ui::Weather),
-    cache(cacheDirectory)
+    cache(cacheDirectory),
+    history(tool.cityNames())
 {
     ui->setupUi(this);
 
     // 候选列表保留中文名称，独立搜索角色支持中文、全拼及首字母。
-    QSettings settings(QSettings::IniFormat, QSettings::UserScope, "WeatherProject", "Weather");
-    QStringList names = tool.cityNames();
-    for (const QString &name : settings.value("search/recentCities").toStringList()) {
-        if (names.contains(name) && !searchHistory.contains(name) && searchHistory.size() < 20)
-            searchHistory.append(name);
-    }
+    const QStringList names = tool.cityNames();
+    searchHistory = history.entries();
     ui->cityComboBox->addItems(names);
     ui->cityComboBox->setHistory(searchHistory);
     QFile searchFile(":/data/city-search.json");
@@ -123,18 +120,30 @@ Weather::Weather(QWidget *parent, const QString &cacheDirectory) :
     }
 
     // 请求天气API信息
-    url = "http://t.weather.itboy.net/api/weather/city/";
     city = searchHistory.isEmpty() ? QString::fromUtf8(u8"长沙") : searchHistory.first();
 
-    manager = new QNetworkAccessManager(this);
-    requestTimer.setSingleShot(true);
-    requestTimer.setInterval(10000);
-    connect(&requestTimer, &QTimer::timeout, this, [this]() {
-        if (activeReply) { timedOut = true; activeReply->abort(); }
+    service = new WeatherService(this, network);
+    connect(service, &WeatherService::failed, this, [this](const QString &error) {
+        if (closing) return;
+        failedCity = city;
+        showRequestStatus(error, true);
+    });
+    connect(service, &WeatherService::succeeded, this,
+            [this](const WeatherData &data, const QByteArray &bytes, const QDateTime &at) {
+        if (closing) return;
+        commitWeather(data, city, at, false);
+        failedCity.clear();
+        saveSearchHistory(activeCode);
+        QString error;
+        if (!cache.save(activeCode, bytes, at, error)) {
+            qWarning() << "[WeatherCache] Save failed:" << error;
+            showRequestStatus(QString::fromUtf8(u8"天气已更新，但本地缓存保存失败"));
+        } else {
+            showRequestStatus(QString::fromUtf8(u8"%1天气更新成功").arg(displayedCity));
+        }
     });
     ui->retryBt->hide();
     connect(ui->retryBt, &QPushButton::clicked, this, [this]() { requestWeather(failedCity); });
-    connect(manager, SIGNAL(finished(QNetworkReply*)), this, SLOT(replayFinished(QNetworkReply*)));
     requestWeather(city);
 
     /* 事件过滤 */
@@ -192,11 +201,7 @@ void Weather::commitWeather(const WeatherData &data, const QString &name, const 
 
 void Weather::stopRequest()
 {
-    ++requestId; // abort 可能同步发出 finished，必须先使旧请求失效。
-    requestTimer.stop();
-    auto previous = activeReply;
-    activeReply.clear();
-    if (previous) previous->abort();
+    service->cancel();
 }
 
 void Weather::closeEvent(QCloseEvent *event)
@@ -215,69 +220,17 @@ void Weather::requestWeather(const QString &cityName)
         showRequestStatus(QString::fromUtf8(u8"请输入有效城市或从候选列表选择"), !failedCity.isEmpty());
         return;
     }
-    if (activeReply && activeCode == code) return;
+    if (service->isActive(code)) return;
     stopRequest();
     city = target;
     activeCode = code;
     failedCity.clear();
-    timedOut = false;
     CachedWeather cached;
     QString cacheError;
     if (cache.load(code, cached, cacheError))
         commitWeather(cached.data, target, cached.fetchedAt, true);
-    elapsed.start();
-    activeReply = manager->get(QNetworkRequest(QUrl(url + code)));
-    activeReply->setProperty("requestId", QVariant::fromValue(requestId));
-    activeReply->setProperty("cityCode", code);
-    qInfo().noquote() << "[Weather] Request" << requestId << target << code << activeReply->url();
-    requestTimer.start();
+    service->fetch(code);
     showRequestStatus(QString::fromUtf8(u8"正在联网更新%1天气……").arg(target));
-}
-
-void Weather::replayFinished(QNetworkReply *reply)
-{
-    reply->deleteLater();
-    const auto id = reply->property("requestId").toULongLong();
-    if (closing || id != requestId || reply != activeReply) {
-        qInfo() << "[Weather] Ignored obsolete request" << id;
-        return;
-    }
-    requestTimer.stop();
-    activeReply.clear();
-    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    const QByteArray bytes = reply->readAll();
-    qInfo().noquote() << "[Weather] Response" << id << activeCode << "elapsed ms:" << elapsed.elapsed()
-                      << "HTTP:" << status << "Network error:" << int(reply->error());
-    qInfo().noquote() << "[Weather] Body:\n" << QString::fromUtf8(bytes);
-    QString error;
-    QString category;
-    WeatherData parsed;
-    if (timedOut) {
-        category = "timeout"; error = QString::fromUtf8(u8"请求超时，请稍后重试");
-    } else if (status != 0 && status != 200) {
-        category = "http"; error = QString::fromUtf8(u8"天气服务暂时不可用（HTTP %1）").arg(status);
-    } else if (reply->error() != QNetworkReply::NoError || status == 0) {
-        category = "network"; error = QString::fromUtf8(u8"网络连接失败，请检查网络");
-    } else if (!parseWeatherData(bytes, activeCode, parsed, error)) {
-        category = "data";
-    }
-    if (!error.isEmpty()) {
-        failedCity = city;
-        qWarning().noquote() << "[Weather] Failed" << id << category << error << reply->errorString();
-        showRequestStatus(error, true);
-        return;
-    }
-    const auto fetchedAt = QDateTime::currentDateTimeUtc();
-    commitWeather(parsed, city, fetchedAt, false);
-    failedCity.clear();
-    saveSearchHistory(activeCode);
-    QString cacheError;
-    if (!cache.save(activeCode, bytes, fetchedAt, cacheError)) {
-        qWarning() << "[WeatherCache] Save failed:" << activeCode << cacheError;
-        showRequestStatus(QString::fromUtf8(u8"天气已更新，但本地缓存保存失败"));
-    } else {
-        showRequestStatus(QString::fromUtf8(u8"%1天气更新成功").arg(displayedCity));
-    }
 }
 
 void Weather::saveSearchHistory(const QString &cityCode)
@@ -291,15 +244,8 @@ void Weather::saveSearchHistory(const QString &cityCode)
         }
     }
     if (name.isEmpty()) return;
-    searchHistory.removeAll(name);
-    searchHistory.prepend(name);
-    while (searchHistory.size() > 20) searchHistory.removeLast();
-    QSettings settings(QSettings::IniFormat, QSettings::UserScope, "WeatherProject", "Weather");
-    settings.setValue("search/recentCities", searchHistory);
-    settings.sync();
-    if (settings.status() != QSettings::NoError)
-        qWarning() << "[Weather] Could not save search history:" << settings.fileName();
-
+    history.record(name);
+    searchHistory = history.entries();
     ui->cityComboBox->setHistory(searchHistory);
 }
 
