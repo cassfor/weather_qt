@@ -52,3 +52,6 @@ HEADERS += WeatherData.h
 
 SOURCES += WeatherCache.cpp
 HEADERS += WeatherCache.h
+
+SOURCES += WeatherService.cpp SearchHistory.cpp
+HEADERS += WeatherService.h SearchHistory.h

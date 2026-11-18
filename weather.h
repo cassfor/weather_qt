@@ -1,4 +1,4 @@
-﻿#ifndef WEATHER_H
+#ifndef WEATHER_H
 #define WEATHER_H
 
 #include <QWidget>
@@ -19,6 +19,8 @@
 #include "WeatherTool.h"
 #include "WeatherData.h"
 #include "WeatherCache.h"
+#include "WeatherService.h"
+#include "SearchHistory.h"
 #include <QPointer>
 #include <QElapsedTimer>
 #include <QCloseEvent>
@@ -34,7 +36,8 @@ class Weather : public QWidget
     friend class Stage2Test;
 
 public:
-    explicit Weather(QWidget *parent = 0, const QString &cacheDirectory = QString());
+    explicit Weather(QWidget *parent = 0, const QString &cacheDirectory = QString(),
+                     QNetworkAccessManager *network = nullptr);
     ~Weather();
 
 protected:
@@ -45,7 +48,6 @@ protected:
     void contextMenuEvent(QContextMenuEvent *menuEvent);
 
 private slots:
-    void replayFinished(QNetworkReply *reply);
     void on_searchBt_clicked();
     void on_refreshBt_clicked();
     void slot_exitApp();
@@ -72,8 +74,7 @@ private:
 
     QTimer *sunTimer;
 
-    QNetworkAccessManager *manager;
-    QString url;
+    WeatherService *service;
     QString city;
     QString displayedCity;
     WeatherCache cache;
@@ -85,16 +86,12 @@ private:
     bool displayedExpired() const;
     QString failedCity;
     QString activeCode;
-    QPointer<QNetworkReply> activeReply;
-    QTimer requestTimer;
-    QElapsedTimer elapsed;
-    quint64 requestId = 0;
-    bool timedOut = false;
     bool closing = false;
     void requestWeather(const QString &cityName);
     void showRequestStatus(const QString &text, bool retry = false);
     void stopRequest();
     WeatherTool tool;
+    SearchHistory history;
     QStringList searchHistory;
     void saveSearchHistory(const QString &cityCode);
 

@@ -52,13 +52,14 @@ static int run() {
     const auto bj = QString::fromUtf8(u8"北京"), sh = QString::fromUtf8(u8"上海");
     QSettings settings(QSettings::IniFormat,QSettings::UserScope,"WeatherProject","Weather");
     settings.setValue("search/recentCities", QStringList{bj}); settings.sync();
-    Weather w(nullptr,dir.path());
+    Manager network;
+    auto manager = &network;
+    manager->responses.append({"",0,100,false});
+    Weather w(nullptr,dir.path(),manager);
     CHECK(w.displayedCity == bj && w.displayedFromCache);
     CHECK(w.displayedFetchedAt == midnight && w.displayedExpired());
     CHECK(w.findChild<QLineEdit*>()->text().isEmpty());
-    w.stopRequest(); delete w.manager;
-    auto manager = new Manager(&w); w.manager = manager;
-    QObject::connect(manager,&QNetworkAccessManager::finished,&w,&Weather::replayFinished);
+    w.stopRequest();
     auto status = w.findChild<QLabel*>("requestStatusLb");
     for (const Response &response : QList<Response>{{"",0,10,false},{"bad",503,10,false},{"bad",200,10,false}}) {
         manager->responses.append(response); w.requestWeather(bj);
@@ -67,11 +68,11 @@ static int run() {
         CHECK(status->text().contains(QString::fromUtf8(u8"本地缓存")));
         CHECK(w.searchHistory == QStringList{bj});
     }
-    w.requestTimer.setInterval(20);
+    w.service->setTimeout(20);
     manager->responses.append({fixture(code),200,100,false});
     w.requestWeather(bj); QTest::qWait(150);
     CHECK(w.displayedFromCache && w.failedCity == bj);
-    w.requestTimer.setInterval(10000);
+    w.service->setTimeout(10000);
     manager->responses.append({fixture(code),200,10,false});
     w.findChild<QPushButton*>("retryBt")->click(); QTest::qWait(150);
     CHECK(!w.displayedFromCache && w.failedCity.isEmpty());
