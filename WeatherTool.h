@@ -18,6 +18,11 @@ public:
             names.append(entry.first);
         return names;
     }
+    QString cityName(const QString &code) const {
+        for (const auto &entry : m_mapCity2Code)
+            if (entry.second == code) return entry.first;
+        return QString();
+    }
     WeatherTool(){
         QJsonParseError err;
         QFile file(":/data/citycode-2019-08-23.json");

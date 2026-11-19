@@ -167,13 +167,29 @@ background-color: rgba(255, 255, 255, 0);</string>
           </property>
          </widget>
         </item>
-        <item row="1" column="0" colspan="4">
+        <item row="1" column="0" colspan="5">
+         <layout class="QHBoxLayout" name="favoritesLayout">
+          <item><widget class="QLabel" name="favoritesTitleLb"><property name="text"><string>收藏城市</string></property></widget></item>
+          <item><widget class="QComboBox" name="favoritesComboBox">
+           <property name="styleSheet"><string>QComboBox { background: white; color: black; padding: 3px; } QComboBox QAbstractItemView { background: white; color: black; selection-background-color: #cce8ff; selection-color: black; }</string></property>
+           <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>1</horstretch><verstretch>0</verstretch></sizepolicy></property>
+           <property name="enabled"><bool>false</bool></property>
+           <item><property name="text"><string>暂无收藏城市</string></property></item>
+          </widget></item>
+          <item><widget class="QPushButton" name="favoriteViewBt"><property name="text"><string>查看天气</string></property><property name="enabled"><bool>false</bool></property></widget></item>
+          <item><widget class="QPushButton" name="favoriteRemoveBt"><property name="text"><string>移除收藏</string></property><property name="enabled"><bool>false</bool></property></widget></item>
+         </layout>
+        </item>
+        <item row="3" column="0" colspan="5"><widget class="QLabel" name="favoriteStatusLb">
+         <property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property>
+        </widget></item>
+        <item row="2" column="0" colspan="4">
          <widget class="QLabel" name="requestStatusLb">
           <property name="text"><string>等待查询</string></property>
           <property name="wordWrap"><bool>true</bool></property>
          </widget>
         </item>
-        <item row="1" column="4">
+        <item row="2" column="4">
          <widget class="QPushButton" name="retryBt">
           <property name="text"><string>重试</string></property>
          </widget>
@@ -267,6 +283,9 @@ background-color: rgba(60, 60, 60, 0);</string>
             </property>
            </widget>
           </item>
+          <item row="0" column="2"><widget class="QPushButton" name="favoriteBt">
+           <property name="text"><string>收藏</string></property><property name="enabled"><bool>false</bool></property>
+          </widget></item>
          </layout>
         </item>
         <item row="0" column="1">

@@ -11,7 +11,7 @@ try {
     if ($LASTEXITCODE) { throw 'qmake failed' }
     mingw32-make -j4
     if ($LASTEXITCODE) { throw 'build failed' }
-    g++ -std=c++11 -fPIC -I../ -I. "-I$qtRoot/include" "-I$qtRoot/include/QtWidgets" "-I$qtRoot/include/QtGui" "-I$qtRoot/include/QtCore" "-I$qtRoot/include/QtNetwork" "-I$qtRoot/include/QtTest" ../tests/stage3-test.cpp release/WeatherService.o release/moc_WeatherService.o release/SearchHistory.o release/weather.o release/WeatherData.o release/WeatherCache.o release/moc_weather.o release/qrc_citydata.o release/qrc_icons.o release/qrc_images.o release/qrc_weatypeico_manual.o "-L$qtRoot/lib" -lQt5Widgets -lQt5Gui -lQt5Network -lQt5Core -lQt5Test -o stage3-test.exe
+    g++ -std=c++11 -fPIC -I../ -I. "-I$qtRoot/include" "-I$qtRoot/include/QtWidgets" "-I$qtRoot/include/QtGui" "-I$qtRoot/include/QtCore" "-I$qtRoot/include/QtNetwork" "-I$qtRoot/include/QtTest" ../tests/stage3-test.cpp release/WeatherService.o release/moc_WeatherService.o release/SearchHistory.o release/FavoriteCities.o release/weather.o release/WeatherData.o release/WeatherCache.o release/moc_weather.o release/qrc_citydata.o release/qrc_icons.o release/qrc_images.o release/qrc_weatypeico_manual.o "-L$qtRoot/lib" -lQt5Widgets -lQt5Gui -lQt5Network -lQt5Core -lQt5Test -o stage3-test.exe
     if ($LASTEXITCODE) { throw 'test compile failed' }
     $env:QT_QPA_PLATFORM = 'offscreen'
     $systemFonts = Join-Path $env:WINDIR 'Fonts'

@@ -47,7 +47,8 @@ Weather::Weather(QWidget *parent, const QString &cacheDirectory, QNetworkAccessM
     QWidget(parent),
     ui(new Ui::Weather),
     cache(cacheDirectory),
-    history(tool.cityNames())
+    history(tool.cityNames()),
+    favorites(tool)
 {
     ui->setupUi(this);
 
@@ -67,6 +68,25 @@ Weather::Weather(QWidget *parent, const QString &cacheDirectory, QNetworkAccessM
     ui->cityComboBox->lineEdit()->setPlaceholderText(u8"城市 / 拼音 / 首字母" );
     connect(ui->cityComboBox->lineEdit(), &QLineEdit::returnPressed,
             this, &Weather::on_searchBt_clicked);
+
+    connect(ui->favoriteBt, &QPushButton::clicked, this, [this]() {
+        if (displayedCity.isEmpty()) return;
+        const QString code = tool[displayedCity];
+        QString error;
+        const bool ok = favorites.contains(code) ? favorites.remove(code, error) : favorites.add(code, error);
+        finishFavoriteChange(ok, error);
+    });
+    connect(ui->favoriteViewBt, &QPushButton::clicked, this, [this]() {
+        const QString name = tool.cityName(ui->favoritesComboBox->currentData().toString());
+        if (!name.isEmpty()) requestWeather(name);
+    });
+    connect(ui->favoriteRemoveBt, &QPushButton::clicked, this, [this]() {
+        QString error;
+        const bool ok = favorites.remove(ui->favoritesComboBox->currentData().toString(), error);
+        finishFavoriteChange(ok, error);
+    });
+    updateFavoriteControls();
+    ui->favoriteStatusLb->hide();
 
     // 使用系统窗口边框，支持边缘缩放、最大化和标题栏拖动。
 
@@ -196,7 +216,37 @@ void Weather::commitWeather(const WeatherData &data, const QString &name, const 
     displayedCity = name;
     displayedFetchedAt = at;
     displayedFromCache = fromCache;
+    updateFavoriteControls();
     setLabelContent();
+}
+
+void Weather::updateFavoriteControls()
+{
+    const QString selected = ui->favoritesComboBox->currentData().toString();
+    const QSignalBlocker blocker(ui->favoritesComboBox);
+    ui->favoritesComboBox->clear();
+    for (const QString &code : favorites.entries())
+        ui->favoritesComboBox->addItem(tool.cityName(code), code);
+    const bool available = !favorites.entries().isEmpty();
+    if (!available) ui->favoritesComboBox->addItem(QString::fromUtf8(u8"暂无收藏城市"));
+    const int index = ui->favoritesComboBox->findData(selected);
+    if (index >= 0) ui->favoritesComboBox->setCurrentIndex(index);
+    ui->favoritesComboBox->setEnabled(available);
+    ui->favoriteViewBt->setEnabled(available);
+    ui->favoriteRemoveBt->setEnabled(available);
+    const QString code = tool[displayedCity];
+    ui->favoriteBt->setEnabled(!displayedCity.isEmpty() && !tool.cityName(code).isEmpty());
+    ui->favoriteBt->setText(favorites.contains(code) ? QString::fromUtf8(u8"取消收藏") : QString::fromUtf8(u8"收藏"));
+    ui->favoriteBt->setToolTip(QString::fromUtf8(u8"收藏或取消收藏当前展示城市：%1").arg(displayedCity));
+}
+
+void Weather::finishFavoriteChange(bool ok, const QString &error)
+{
+    updateFavoriteControls();
+    // Keep weather errors/retry state independent of favorites persistence messages.
+    ui->favoriteStatusLb->setText(ok ? QString() : error);
+    ui->favoriteStatusLb->setVisible(!ok);
+    if (!ok) qWarning().noquote() << "[FavoriteCities]" << error;
 }
 
 void Weather::stopRequest()
