@@ -21,6 +21,7 @@
 #include "WeatherCache.h"
 #include "WeatherService.h"
 #include "SearchHistory.h"
+#include "FavoriteCities.h"
 #include <QPointer>
 #include <QElapsedTimer>
 #include <QCloseEvent>
@@ -34,6 +35,7 @@ class Weather : public QWidget
     Q_OBJECT
     friend class Stage1Test;
     friend class Stage2Test;
+    friend class Stage4Test;
 
 public:
     explicit Weather(QWidget *parent = 0, const QString &cacheDirectory = QString(),
@@ -92,6 +94,9 @@ private:
     void stopRequest();
     WeatherTool tool;
     SearchHistory history;
+    FavoriteCities favorites;
+    void updateFavoriteControls();
+    void finishFavoriteChange(bool ok, const QString &error);
     QStringList searchHistory;
     void saveSearchHistory(const QString &cityCode);
 
